@@ -12,13 +12,14 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // 全局错误处理
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((err, _request, reply) => {
+    const error = err as Error & { validation?: unknown };
     if (error instanceof AppError) {
       return reply.status(error.statusCode).send(error.toJSON());
     }
 
     // 处理 Fastify validation 错误
-    if (error.validation) {
+    if ("validation" in error && error.validation) {
       return reply.status(422).send({
         error: {
           code: "VALIDATION_ERROR",
