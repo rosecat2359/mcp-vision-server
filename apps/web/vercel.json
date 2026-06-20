@@ -1,0 +1,16 @@
+{
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@mcp-hub/web",
+  "outputDirectory": "dist",
+  "installCommand": "pnpm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://YOUR_RAILWAY_APP.railway.app/api/:path*"
+    },
+    {
+      "source": "/ws/:path*",
+      "destination": "https://YOUR_RAILWAY_APP.railway.app/ws/:path*"
+    }
+  ]
+}

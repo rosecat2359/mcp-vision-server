@@ -1,8 +1,11 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./sidebar.js";
 import { Topbar } from "./topbar.js";
+import { useWebSocket } from "../../hooks/use-websocket.js";
 
 export function AppShell() {
+  useWebSocket();
+
   return (
     <div className="flex h-screen">
       <Sidebar />

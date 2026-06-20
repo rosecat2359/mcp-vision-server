@@ -179,3 +179,28 @@ python -m pytest tests/ -v
 - MCP SDK (stdio)
 - httpx (HTTP)
 - Pillow (图片处理)
+
+## MCP Hub 部署指南
+
+### 前端 (Vercel)
+1. 在 Vercel 中导入此仓库
+2. 设置 Root Directory: `apps/web`
+3. 设置 Framework Preset: Vite
+4. 部署
+
+### 后端 (Railway)
+1. 在 Railway 中从 GitHub 导入
+2. 设置环境变量（见下方）
+3. 部署
+
+### 环境变量
+
+| 变量 | 值 |
+|------|-----|
+| `DATABASE_URL` | `postgresql://...` |
+| `REDIS_URL` | `redis://...` |
+| `ENCRYPTION_MASTER_KEY` | 64 hex 字符 |
+| `JWT_SECRET` | 至少 32 字符 |
+| `JWT_REFRESH_SECRET` | 至少 32 字符 |
+| `CORS_ORIGIN` | Vercel 部署地址 |
+

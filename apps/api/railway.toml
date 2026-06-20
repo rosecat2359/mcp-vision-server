@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd ../.. && pnpm install && cd apps/api && pnpm prisma generate"
+
+[deploy]
+startCommand = "node dist/index.js"
+
+[service]
+port = 3001
