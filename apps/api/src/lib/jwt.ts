@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 import { getEnv } from "../env.js";
 import { AppError, ErrorCodes } from "./errors.js";
 
@@ -21,6 +22,11 @@ export function generateRefreshToken(userId: string, tenantId: string): string {
     expiresIn: "7d",
     issuer: "mcp-hub",
   });
+}
+
+/** 对 refresh token 做 SHA-256 哈希，存入 DB 用于轮换检测 */
+export function hashRefreshToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 export function verifyAccessToken(token: string): JwtPayload {

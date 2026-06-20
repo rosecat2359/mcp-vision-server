@@ -18,13 +18,14 @@ model Tenant {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  tenantId     String
-  email        String   @unique
-  passwordHash String
-  role         UserRole @default(Viewer)
-  totpSecret   String?
-  createdAt    DateTime @default(now())
+  id                String   @id @default(uuid())
+  tenantId          String
+  email             String   @unique
+  passwordHash      String
+  role              UserRole @default(Viewer)
+  totpSecret        String?
+  refreshTokenHash  String?  // SHA-256 hash of current refresh token for rotation/revocation
+  createdAt         DateTime @default(now())
 
   tenant    Tenant    @relation(fields: [tenantId], references: [id])
   auditLogs AuditLog[]

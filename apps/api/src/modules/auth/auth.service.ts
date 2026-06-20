@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../lib/errors.js";
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../lib/jwt.js";
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, hashRefreshToken } from "../../lib/jwt.js";
 import type { RegisterInput, LoginInput, LoginResponse, RefreshResponse } from "@mcp-hub/shared";
 
 const SALT_ROUNDS = 12;
@@ -36,6 +36,13 @@ export async function register(input: RegisterInput): Promise<LoginResponse> {
 
   const accessToken = generateAccessToken(result.user.id, result.tenant.id);
   const refreshToken = generateRefreshToken(result.user.id, result.tenant.id);
+  const refreshHash = hashRefreshToken(refreshToken);
+
+  // 存储 refresh token 哈希用于轮换检测
+  await prisma.user.update({
+    where: { id: result.user.id },
+    data: { refreshTokenHash: refreshHash },
+  });
 
   return {
     accessToken,
@@ -72,6 +79,12 @@ export async function login(input: LoginInput): Promise<LoginResponse> {
 
   const accessToken = generateAccessToken(user.id, user.tenantId);
   const refreshToken = generateRefreshToken(user.id, user.tenantId);
+  const refreshHash = hashRefreshToken(refreshToken);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshTokenHash: refreshHash },
+  });
 
   return {
     accessToken,
@@ -98,8 +111,26 @@ export async function refresh(token: string): Promise<RefreshResponse> {
     throw new AppError(401, "TOKEN_INVALID", "用户不存在或已被删除");
   }
 
+  // 验证 refresh token 哈希 — 实现轮换/撤销机制
+  const tokenHash = hashRefreshToken(token);
+  if (!user.refreshTokenHash || user.refreshTokenHash !== tokenHash) {
+    // token 已被使用过（replay attack）或已撤销 → 撤销所有 refresh
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshTokenHash: null },
+    });
+    throw new AppError(401, "TOKEN_INVALID", "Refresh Token 已被使用，请重新登录");
+  }
+
   const accessToken = generateAccessToken(user.id, user.tenantId);
   const newRefreshToken = generateRefreshToken(user.id, user.tenantId);
+  const newHash = hashRefreshToken(newRefreshToken);
+
+  // 原子轮换: 旧 hash → 新 hash
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshTokenHash: newHash },
+  });
 
   return { accessToken, refreshToken: newRefreshToken };
 }

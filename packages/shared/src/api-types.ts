@@ -159,7 +159,19 @@ export interface WsEventKeyTestResult {
   isValid: boolean;
 }
 
-export type WsEvent = WsEventServerStatus | WsEventConnectionLog | WsEventKeyTestResult;
+/** WebSocket 错误消息（认证失败等） */
+export interface WsEventError {
+  type: "error";
+  message: string;
+}
+
+/** WebSocket 连接成功 */
+export interface WsEventConnected {
+  type: "connected";
+  clientId: string;
+}
+
+export type WsEvent = WsEventServerStatus | WsEventConnectionLog | WsEventKeyTestResult | WsEventError | WsEventConnected;
 
 // ===== 错误响应 =====
 export interface ApiError {
