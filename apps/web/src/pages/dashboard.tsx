@@ -1,3 +1,5 @@
+import { AppShell } from "../components/layout/app-shell.js";
+
 export function Dashboard() {
-  return <div className="p-8">Dashboard Page (coming soon)</div>;
+  return <AppShell />;
 }
