@@ -24,8 +24,8 @@ export async function testConnection(
         signal: AbortSignal.timeout(10000),
       });
     } else {
-      // stdio: 无法通过 HTTP 测试，假设可达
-      return { success: true, latencyMs: 0 };
+      // stdio: 无法通过 HTTP 测试
+      return { success: false, latencyMs: 0, error: "stdio 传输模式无法通过 HTTP 进行连接测试，请直接在服务器上验证" };
     }
 
     const latencyMs = Date.now() - start;
