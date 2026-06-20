@@ -1,4 +1,5 @@
 """视频处理工具 — analyze_video + generate_video"""
+import base64
 import re
 from typing import Any, Dict, List, Optional
 
@@ -21,17 +22,17 @@ async def handle_analyze_video(
     if fps:
         text_prompt += f"（采样帧率: {fps} fps）"
 
-    content: List[Dict[str, Any]]
     if media["type"] == "data_uri":
-        content = [
-            {"type": "video_url", "video_url": {"url": media["value"]}},
-            {"type": "text", "text": text_prompt},
-        ]
+        # 本地文件 → base64 data URI 内联传递给视频模型
+        video_block = {"type": "video_url", "video_url": {"url": media["value"]}}
     else:
-        content = [
-            {"type": "video_url", "video_url": {"url": media["value"]}},
-            {"type": "text", "text": text_prompt},
-        ]
+        # HTTP URL 透传给下游 API
+        video_block = {"type": "video_url", "video_url": {"url": media["value"]}}
+
+    content: List[Dict[str, Any]] = [
+        video_block,
+        {"type": "text", "text": text_prompt},
+    ]
 
     result = await client.chat_completion(messages=[{"role": "user", "content": content}])
     return result["choices"][0]["message"]["content"]
@@ -69,7 +70,8 @@ async def handle_generate_video(
                 data_uri = await download_to_base64(url, http_client)
                 videos.append(data_uri)
     else:
-        # API 可能直接在 response 中返回了内容
-        videos.append(response_text)
+        # API 未返回视频 URL，将响应文本以 text/plain data URI 形式返回
+        encoded_text = base64.b64encode(response_text.encode("utf-8")).decode("ascii")
+        videos.append(f"data:text/plain;base64,{encoded_text}")
 
     return videos

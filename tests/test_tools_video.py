@@ -39,7 +39,7 @@ class TestAnalyzeVideo:
         has_text = any(
             "描述这个视频" in str(item.get("text", "")) for item in user_content
         )
-        assert has_video or True  # 格式取决于 API
+        assert has_video
 
     @pytest.mark.asyncio
     async def test_default_prompt(self, mock_client):
