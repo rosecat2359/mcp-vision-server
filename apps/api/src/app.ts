@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
+import helmet from "@fastify/helmet";
 import { AppError } from "./lib/errors.js";
 import { getEnv } from "./env.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
@@ -7,6 +8,9 @@ import { serversRoutes } from "./modules/servers/servers.routes.js";
 import { keysRoutes } from "./modules/keys/keys.routes.js";
 import { logsRoutes } from "./modules/logs/logs.routes.js";
 import { connectRoutes } from "./modules/connect/connect.routes.js";
+import { corsSetup } from "./plugins/cors.js";
+import { rateLimitSetup } from "./plugins/rate-limit.js";
+import { websocketRoutes } from "./plugins/websocket.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -48,6 +52,17 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get("/api/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  // 安全插件
+  await app.register(helmet, {
+    contentSecurityPolicy: false, // 由 API 网关处理
+    hsts: { maxAge: 63072000, includeSubDomains: true },
+  });
+  await corsSetup(app);
+  await rateLimitSetup(app);
+
+  // WebSocket
+  await app.register(websocketRoutes);
 
   // 注册认证路由
   await app.register(authRoutes);
