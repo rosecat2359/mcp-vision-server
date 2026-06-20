@@ -17,7 +17,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const env = getEnv();
   const app = Fastify({
     logger: env.NODE_ENV === "development"
-      ? { transport: { target: "pino-pretty", options: { colorize: true } } }
+      ? { level: "info" }
       : true,
   });
 
