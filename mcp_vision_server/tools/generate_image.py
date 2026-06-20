@@ -2,15 +2,16 @@
 from typing import Any, Dict, List, Optional
 import httpx
 from ..utils.media import resolve_media_input, download_to_base64
-from ..client import AgnesClient
+from ..providers.adapters.openai_compat import OpenAICompatibleProvider
 
 
 async def handle_generate_image(
-    client: AgnesClient,
+    client: OpenAICompatibleProvider,
     prompt: str,
     size: str = "1024x1024",
     style: Optional[str] = None,
     n: int = 1,
+    model: Optional[str] = None,
 ) -> List[str]:
     """文生图 — 返回 base64 data URI 列表"""
     extra: Dict[str, Any] = {}
@@ -18,7 +19,7 @@ async def handle_generate_image(
         extra["style"] = style
 
     result = await client.image_generation(
-        prompt=prompt, size=size, n=n, **extra
+        prompt=prompt, size=size, n=n, model=model, **extra
     )
 
     # 下载生成的图片并转为 base64
@@ -36,10 +37,11 @@ async def handle_generate_image(
 
 
 async def handle_edit_image(
-    client: AgnesClient,
+    client: OpenAICompatibleProvider,
     image_url: str,
     prompt: str,
     mask_url: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> str:
     """编辑/修复图片，返回编辑后图片的 base64 data URI"""
     media = resolve_media_input(image_url)
@@ -58,7 +60,8 @@ async def handle_edit_image(
     })
 
     result = await client.chat_completion(
-        messages=[{"role": "user", "content": content}]
+        messages=[{"role": "user", "content": content}],
+        model=model,
     )
 
     return result["choices"][0]["message"]["content"]

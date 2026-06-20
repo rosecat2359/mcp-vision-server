@@ -13,6 +13,12 @@ from mcp_vision_server.utils.errors import VisionError
 def client():
     """创建带测试 key 的 AgnesClient"""
     os.environ["AGNES_API_KEY"] = "sk-test-client"
+    # 强制重新加载 config 和 client 模块，确保读到测试用的 key
+    from importlib import reload
+    import mcp_vision_server.config
+    reload(mcp_vision_server.config)
+    import mcp_vision_server.client
+    reload(mcp_vision_server.client)
     from mcp_vision_server.client import AgnesClient
 
     return AgnesClient()

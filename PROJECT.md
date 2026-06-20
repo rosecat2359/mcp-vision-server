@@ -10,18 +10,18 @@
 | 项 | 详情 |
 |----|------|
 | 项目名称 | `mcp-vision-server` |
-| 版本 | `0.1.0` |
+| 版本 | `0.2.0` |
 | 位置 | `D:\AI Project\mcp-vision-server\` |
 | 语言 | Python 3.12（最低要求 3.11） |
-| 代码行数 | ~1100 行（含测试） |
-| 测试数量 | 55 个 |
-| 提交数量 | 12 次 commit |
+| 代码行数 | ~1800 行（含测试） |
+| 测试数量 | 86 个 |
+| 提交数量 | 13 次 commit |
 | 设计文档 | `D:\AI Project\docs\superpowers\specs\2026-06-20-mcp-vision-server-design.md` |
 | 实施计划 | `D:\AI Project\docs\superpowers\plans\2026-06-20-mcp-vision-server.md` |
 
 ### 这个项目做什么？
 
-一个 **MCP（Model Context Protocol）服务**，通过 stdio 通信为没有视觉能力的 AI 模型（如 DeepSeek V4 Pro）提供 6 个视觉工具。后端对接 **Agnes AI API**。
+一个 **MCP（Model Context Protocol）服务**，通过 stdio 通信为没有视觉能力的 AI 模型（如 DeepSeek V4 Pro）提供 7 个视觉工具。后端支持多种 AI API 提供商，按任务类型**自动路由**到最优模型。
 
 ### 用户怎么用？
 
@@ -34,6 +34,7 @@
 用户: "把这张图的背景换成蓝色天空"       → 自动调用 edit_image
 用户: "分析这个视频的内容"               → 自动调用 analyze_video
 用户: "根据这个描述生成视频"             → 自动调用 generate_video
+用户: "当前有哪些可用的 AI 服务？"       → 自动调用 list_providers
 ```
 
 ---
@@ -41,22 +42,42 @@
 ## 2. 架构概览
 
 ```
-┌──────────┐      MCP stdio        ┌──────────────────┐        HTTPS          ┌────────────┐
-│  Claude   │ ◄───────────────────► │  mcp-vision-server │ ◄───────────────────► │  Agnes AI   │
-│  (MCP宿主) │    JSON-RPC 2.0      │  (Python 子进程)   │   Bearer sk-xxx     │  API        │
-└──────────┘                       └──────────────────┘                       └────────────┘
+                    ┌──────────────────────────────────────────┐
+                    │           ProviderRegistry              │
+                    │  按 Capability 自动路由到最优 Provider    │
+                    │                                          │
+                    │  ┌──────────┐ ┌──────┐ ┌─────────────┐  │
+                    │  │  OpenAI  │ │ Agnes│ │ Custom/其他  │  │
+                    │  └────┬─────┘ └──┬───┘ └──────┬──────┘  │
+                    │       │           │             │         │
+                    └───────┼───────────┼─────────────┼────────┘
+                            │           │             │
+                    ┌───────┴───────────┴─────────────┴────────┐
+                    │     OpenAI 兼容 HTTP API (httpx)         │
+                    └───────┬───────────┬─────────────┬────────┘
+                            │           │             │
+                    ┌───────┴─────┐ ┌───┴──────┐ ┌───┴────────┐
+                    │ OpenAI API   │ │Agnes API │ │自部署 vLLM  │
+                    │ (gpt-4o等)   │ │          │ │Ollama 等    │
+                    └─────────────┘ └─────────┘ └────────────┘
 ```
+
+**核心概念**：
+- **BaseProvider (ABC)**: 所有 Provider 必须实现的统一接口
+- **Capability (Enum)**: VISION / IMAGE_GENERATION / IMAGE_EDIT / VIDEO_ANALYSIS / VIDEO_GENERATION
+- **ProviderRegistry**: 注册所有 Provider，按 Capability 路由到最佳 Provider
+- **OpenAICompatibleProvider**: 通用适配器，连接任何 OpenAI 兼容端点
+- **PROVIDER_CATALOG**: 内置已知 Provider 的默认配置
 
 **数据流**（以 analyze_image 为例）：
 
 ```
 用户说 "分析这张图"
   → Claude 调用 MCP 工具 analyze_image(image_url="D:/photo.png")
-  → server.py 路由到 handle_analyze_image()
-  → utils/media.py: resolve_media_input() 检测本地文件 → 读为 base64 → data URI
-  → tools/analyze_image.py: 构建 vision message（image_url + text prompt）
-  → client.py: POST /v1/chat/completions（Bearer 认证, 120s 超时, 3 次重试）
-  → Agnes AI 返回 {"choices":[{"message":{"content":"描述文字..."}}]}
+  → server.py 路由到 TOOL_CAPABILITY["analyze_image"] → Capability.VISION
+  → registry.get_for_capability(Capability.VISION) → 选择最优 Provider
+  → provider.chat_completion(messages=..., model=...) → HTTP POST
+  → API 返回 {"choices":[{"message":{"content":"描述文字..."}}]}
   → 提取 choices[0].message.content → 返回给 Claude → 展示给用户
 ```
 
@@ -70,14 +91,20 @@
 |------|------|-----------|------------|
 | `mcp_vision_server/__init__.py` | 1 | 包标识 | — |
 | `mcp_vision_server/__main__.py` | 5 | `python -m` 入口 | 调用 `asyncio.run(main())` |
-| `mcp_vision_server/config.py` | 31 | 环境变量 → 配置常量 | `AGNES_API_KEY`, `AGNES_BASE_URL`, `AGNES_DEFAULT_MODEL`, `AGNES_TIMEOUT`, `AGNES_MAX_RETRIES` |
-| `mcp_vision_server/client.py` | 110 | HTTP 客户端：鉴权+重试+错误 | `AgnesClient` 类, `chat_completion()`, `image_generation()`, `_request()` |
-| `mcp_vision_server/server.py` | 293 | MCP 协议层：工具注册+路由+启动 | `server` 实例, `TOOLS` 列表, `handle_list_tools()`, `handle_call_tool()`, `main()` |
+| `mcp_vision_server/config.py` | 85 | 环境变量 → 配置常量（多Provider） | `AGNES_*`, `OPENAI_*`, `VISION_PROVIDER`, `CUSTOM_*` 等 |
+| `mcp_vision_server/client.py` | 122 | AgnesClient（向后兼容） | `AgnesClient` 类 |
+| `mcp_vision_server/server.py` | 320 | MCP 协议层：工具注册+路由+Provider选择+启动 | `TOOLS`, `handle_call_tool()`, `main()`, `_resolve_model()` |
+| `mcp_vision_server/providers/__init__.py` | 5 | Provider 包公开接口 | — |
+| `mcp_vision_server/providers/base.py` | 50 | ABC 接口+Capability 枚举 | `BaseProvider`, `Capability` |
+| `mcp_vision_server/providers/catalog.py` | 62 | 内置 Provider 默认配置 | `PROVIDER_CATALOG` |
+| `mcp_vision_server/providers/registry.py` | 220 | Provider 注册+按能力路由+模块单例 | `ProviderRegistry`, `get_registry()`, `TOOL_CAPABILITY` |
+| `mcp_vision_server/providers/adapters/__init__.py` | 3 | Adapter 子包 | — |
+| `mcp_vision_server/providers/adapters/openai_compat.py` | 135 | 通用 OpenAI 兼容适配器 | `OpenAICompatibleProvider` |
 | `mcp_vision_server/utils/errors.py` | 48 | 统一异常体系 | `VisionError` 类 + 7 个工厂函数 |
 | `mcp_vision_server/utils/media.py` | 82 | 媒体预处理：URL判断/base64 | `is_url()`, `local_to_data_uri()`, `resolve_media_input()`, `download_to_base64()` |
-| `mcp_vision_server/tools/analyze_image.py` | 52 | 图片分析+OCR | `handle_analyze_image()`, `handle_extract_text()`, `_build_vision_message()` |
-| `mcp_vision_server/tools/generate_image.py` | 66 | 文生图+图片编辑 | `handle_generate_image()`, `handle_edit_image()` |
-| `mcp_vision_server/tools/video.py` | 95 | 视频分析+文生视频 | `handle_analyze_video()`, `handle_generate_video()` |
+| `mcp_vision_server/tools/analyze_image.py` | 55 | 图片分析+OCR | `handle_analyze_image()`, `handle_extract_text()` |
+| `mcp_vision_server/tools/generate_image.py` | 68 | 文生图+图片编辑 | `handle_generate_image()`, `handle_edit_image()` |
+| `mcp_vision_server/tools/video.py` | 99 | 视频分析+文生视频 | `handle_analyze_video()`, `handle_generate_video()` |
 
 ### 3.2 测试文件
 
@@ -90,6 +117,8 @@
 | `tests/test_tools_analyze.py` | 4 | tools/analyze_image.py |
 | `tests/test_tools_generate.py` | 3 | tools/generate_image.py |
 | `tests/test_tools_video.py` | 3 | tools/video.py |
+| `tests/providers/test_registry.py` | 16 | providers/registry.py |
+| `tests/providers/test_openai_compat.py` | 15 | providers/adapters/openai_compat.py |
 
 ### 3.3 配置文件
 
@@ -101,16 +130,16 @@
 
 ---
 
-## 4. 6 个工具详解
+## 4. 7 个工具详解
 
 ### `analyze_image` — 图片理解/描述
 
 | 属性 | 值 |
 |------|-----|
-| 输入 | `image_url`（必填，URL或本地路径）, `prompt`（可选）, `model`（可选） |
+| 输入 | `image_url`（必填，URL或本地路径）, `prompt`（可选）, `model`（可选）, `provider`（可选） |
 | 输出 | 文字描述 |
-| 核心代码 | `tools/analyze_image.py:25-40` |
-| API 端点 | `POST /v1/chat/completions` |
+| 核心代码 | `tools/analyze_image.py:25-36` |
+| Provider 能力 | Capability.VISION |
 | 默认提示词 | "请详细描述这张图片的内容。" |
 | 本地文件处理 | `resolve_media_input()` → base64 data URI → `image_url` content block |
 
@@ -120,7 +149,7 @@
 |------|-----|
 | 输入 | `image_url`（必填）, `language`（可选，如"中文"） |
 | 输出 | 提取的文字 |
-| 核心代码 | `tools/analyze_image.py:43-56` |
+| 核心代码 | `tools/analyze_image.py:39-53` |
 | 提示词 | 自动拼接："请提取这张图片中的所有文字内容（语言: xxx）。只返回提取的文字，不要添加额外说明。" |
 
 ### `generate_image` — 文生图
@@ -129,19 +158,18 @@
 |------|-----|
 | 输入 | `prompt`（必填）, `size`（默认 1024x1024）, `style`（可选）, `n`（默认 1） |
 | 输出 | base64 图片列表 |
-| 核心代码 | `tools/generate_image.py:11-36` |
-| API 端点 | `POST /v1/images/generations` |
-| 推荐模型 | `agnes-image-2.1-flash`（当前 client.py 的 `image_generation` 方法使用默认模型，需传入 model 参数指定） |
+| 核心代码 | `tools/generate_image.py:8-35` |
+| Provider 能力 | Capability.IMAGE_GENERATION |
+| 推荐模型 | agnes-image-2.1-flash / dall-e-3 |
 
 ### `edit_image` — 图片编辑/修复
 
 | 属性 | 值 |
 |------|-----|
-| 输入 | `image_url`（必填）, `prompt`（必填）, `mask_url`（可选，蒙版标记编辑区域） |
+| 输入 | `image_url`（必填）, `prompt`（必填）, `mask_url`（可选） |
 | 输出 | 文字结果 |
-| 核心代码 | `tools/generate_image.py:38-66` |
-| API 端点 | `POST /v1/chat/completions`（以 vision message 形式发送） |
-| 注意 | 此功能依赖 API 对图片编辑的支持，实际效果取决于模型能力 |
+| 核心代码 | `tools/generate_image.py:38-68` |
+| Provider 能力 | Capability.IMAGE_EDIT |
 
 ### `analyze_video` — 视频分析/摘要
 
@@ -149,8 +177,8 @@
 |------|-----|
 | 输入 | `video_url`（必填）, `prompt`（可选）, `fps`（可选） |
 | 输出 | 文字描述/摘要 |
-| 核心代码 | `tools/video.py:8-44` |
-| 注意事项 | 视频文件通常较大，base64 编码后体积膨胀 33%，大文件建议用 URL |
+| 核心代码 | `tools/video.py:12-38` |
+| Provider 能力 | Capability.VIDEO_ANALYSIS |
 
 ### `generate_video` — 文生视频
 
@@ -158,8 +186,16 @@
 |------|-----|
 | 输入 | `prompt`（必填）, `duration`（默认 5s）, `resolution`（默认 1080p） |
 | 输出 | 视频 data URI 列表 |
-| 核心代码 | `tools/video.py:47-95` |
-| 注意事项 | 视频生成耗时较长，返回结果取决于 API 是否直接返回视频 URL 或文本描述 |
+| 核心代码 | `tools/video.py:41-77` |
+| Provider 能力 | Capability.VIDEO_GENERATION |
+
+### `list_providers` — 查看可用服务（v0.2 新增）
+
+| 属性 | 值 |
+|------|-----|
+| 输入 | 无 |
+| 输出 | 已配置的 Provider 列表、能力、默认模型、路由信息 |
+| 核心代码 | `server.py:_handle_list_providers()` |
 
 ---
 
@@ -255,13 +291,48 @@ Content-Type: application/json
 
 ## 8. 环境变量完整参考
 
+### 核心配置（多 Provider 选择）
+
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
-| `AGNES_API_KEY` | **是** | `""` | 空字符串时服务仍启动但会打印警告 |
-| `AGNES_BASE_URL` | 否 | `https://apihub.agnes-ai.com/v1` | 自动去除尾部 `/` |
-| `AGNES_DEFAULT_MODEL` | 否 | `agnes-2.0-flash` | 用于 chat_completion 的默认模型 |
+| `VISION_PROVIDER` | 否 | `""` | 全局默认 Provider（`openai`/`agnes`/`openrouter`/`groq`/`custom`） |
+| `IMAGE_PROVIDER` | 否 | `""` | 图片任务专用 Provider（覆盖 VISION_PROVIDER） |
+| `VIDEO_PROVIDER` | 否 | `""` | 视频任务专用 Provider（覆盖 VISION_PROVIDER） |
+| `PROVIDER_FALLBACK` | 否 | `""` | 备选 Provider 列表，逗号分隔（如 `openai,agnes`） |
+
+### 按任务指定模型
+
+| 变量 | 适用工具 | 说明 |
+|------|----------|------|
+| `VISION_MODEL` | analyze_image, extract_text | 覆盖 Provider 默认视觉模型 |
+| `IMAGE_GEN_MODEL` | generate_image | 覆盖 Provider 默认图片生成模型 |
+| `IMAGE_EDIT_MODEL` | edit_image | 覆盖 Provider 默认编辑模型 |
+| `VIDEO_ANALYSIS_MODEL` | analyze_video | 覆盖 Provider 默认视频分析模型 |
+| `VIDEO_GEN_MODEL` | generate_video | 覆盖 Provider 默认视频生成模型 |
+
+### Agnes AI 配置（向后兼容）
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `AGNES_API_KEY` | 否* | `""` | Agnes AI API Key |
+| `AGNES_BASE_URL` | 否 | `https://apihub.agnes-ai.com/v1` | Agnes API 端点 |
+| `AGNES_DEFAULT_MODEL` | 否 | `agnes-2.0-flash` | Agnes 默认模型 |
 | `AGNES_TIMEOUT` | 否 | `120.0` | HTTP 请求超时（秒） |
 | `AGNES_MAX_RETRIES` | 否 | `3` | 最大重试次数 |
+
+> *如果只使用 Agnes 而不设置其他 Provider，则 AGNES_API_KEY 为必填。
+
+### 其他 Provider
+
+| 变量 | Provider | 说明 |
+|------|----------|------|
+| `OPENAI_API_KEY` | OpenAI | OpenAI API Key |
+| `OPENAI_BASE_URL` | OpenAI | 覆盖默认端点 |
+| `OPENROUTER_API_KEY` | OpenRouter | OpenRouter API Key |
+| `GROQ_API_KEY` | Groq | Groq API Key |
+| `CUSTOM_API_KEY` | 自定义 | 自部署端点的 API Key |
+| `CUSTOM_BASE_URL` | 自定义 | 自部署端点的地址 |
+| `CUSTOM_PROVIDER_NAME` | 自定义 | 显示名称（默认 `custom`） |
 
 ---
 
@@ -269,32 +340,37 @@ Content-Type: application/json
 
 ### 9.1 添加新工具
 
-1. 在 `tools/` 下新建文件（如 `tools/face_detect.py`），实现 `async def handle_xxx(client, **params) -> str`
-2. 在 `server.py` 的 `TOOLS` 列表中添加 `Tool(...)` 定义
-3. 在 `server.py` 的 `handle_call_tool()` 中添加 `elif name == "xxx":` 分支
-4. 在 `tests/` 下添加对应测试文件
-5. 运行 `python -m pytest tests/ -v` 验证
+1. 在 `tools/` 下新建文件，实现 `async def handle_xxx(client: OpenAICompatibleProvider, **params) -> str`
+2. 在 `server.py` 的 `_get_all_tools()` 中添加 `Tool(...)` 定义
+3. 判断新工具需要什么 Capability，在 `TOOL_CAPABILITY` 中添加映射（`registry.py`）
+4. 在 `server.py` 的 `handle_call_tool()` 中添加 `elif name == "xxx":` 分支
+5. 在 `tests/` 下添加对应测试文件
+6. 运行 `python -m pytest tests/ -v` 验证
 
-### 9.2 修改默认模型
+### 9.2 添加新的 API Provider
 
-改 `config.py` 第 29 行：
-```python
-AGNES_DEFAULT_MODEL = os.environ.get("AGNES_DEFAULT_MODEL", "你的模型名")
+1. 在 `providers/catalog.py` 的 `PROVIDER_CATALOG` 中添加条目（base_url, capabilities, default_models）
+2. 在 `config.py` 中添加对应的 API Key 环境变量
+3. 在 `providers/registry.py` 的 `_build_registry_from_config()` 的 `known_keys` 字典中添加
+4. 如果 API 格式非 OpenAI 兼容 → 在 `providers/adapters/` 下新建适配器，实现 `BaseProvider` 接口
+
+### 9.3 修改默认模型
+
+方式 1：设置环境变量（推荐，无需改代码）
+```json
+{ "env": { "VISION_MODEL": "gpt-4o-mini" } }
 ```
 
-同时更新 `tests/test_config.py:27-30` 中的断言。
+方式 2：修改 `catalog.py` 中对应 Provider 的 `default_models`
 
-### 9.3 调整重试策略
+### 9.4 调整路由优先级
 
-改 `client.py` 中 `_request()` 方法的:
-- `self.max_retries` — 最大重试次数
-- `await asyncio.sleep(2 ** retries)` — 退避时间（当前 1s→2s→4s）
+修改 `providers/registry.py` 中的 `_build_registry_from_config()` 函数的注册顺序。先注册的 Provider 优先级更高。
 
-### 9.4 更改 API 端点
+### 9.5 调整重试策略
 
-`client.py` 中:
-- `chat_completion()` → `self._request("POST", "/chat/completions", ...)` — 改这里
-- `image_generation()` → `self._request("POST", "/images/generations", ...)` — 改这里
+- 全局：改 `providers/adapters/openai_compat.py` 中 `_request()` 方法的 `self._max_retries` 和 `await asyncio.sleep(2 ** retries)`
+- 按 Provider：在 `catalog.py` 中设置 `timeout_env` 和 `retries_env` 环境变量名
 
 ---
 
@@ -317,7 +393,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 ```
 
-期望输出：**55 passed in ~45s**
+期望输出：**86 passed in ~60s**
 
 ### 手动测试 MCP 服务
 
@@ -325,24 +401,34 @@ python -m pytest tests/ -v
 # 测试服务启动
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | python -m mcp_vision_server
 
-# 期望输出: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"vision-server","version":"0.1.0"}}}
+# 期望输出: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"vision-server","version":"0.2.0"}}}
 ```
 
-### 直接调用 API（调试用）
+### 测试多 Provider 切换
 
 ```bash
-export AGNES_API_KEY="sk-xxx"
-python -c "
-import asyncio
-from mcp_vision_server.client import AgnesClient
-from mcp_vision_server.tools.analyze_image import handle_analyze_image
+# 测试向后兼容（仅有 AGNES_API_KEY）
+AGNES_API_KEY=sk-test python -c "
+from mcp_vision_server.providers.registry import get_registry, reset_registry
+reset_registry()
+r = get_registry()
+print('Providers:', r.list_providers())
+"
 
-async def main():
-    client = AgnesClient()
-    result = await handle_analyze_image(client, image_url='https://example.com/photo.jpg')
-    print(result)
+# 测试切换到 OpenAI
+VISION_PROVIDER=openai OPENAI_API_KEY=sk-test OPENAI_BASE_URL=https://api.openai.com/v1 python -c "
+from mcp_vision_server.providers.registry import get_registry, reset_registry
+reset_registry()
+import os
+os.environ.setdefault('VISION_PROVIDER', 'openai')
+"
 
-asyncio.run(main())
+# 测试混合 Provider 配置
+VISION_PROVIDER=openai IMAGE_PROVIDER=agnes OPENAI_API_KEY=sk-openai AGNES_API_KEY=sk-agnes python -c "
+from mcp_vision_server.providers.registry import get_registry, reset_registry
+reset_registry()
+r = get_registry()
+print(r.list_providers())
 "
 ```
 
@@ -372,11 +458,13 @@ asyncio.run(main())
 1. **仅支持 stdio**，不支持 HTTP/SSE 远程部署
 2. **无流式响应**，所有请求为一次性完整响应
 3. **大视频文件**不建议用本地路径（base64 膨胀 33%），用 HTTP URL
-4. **edit_image** 的实际效果取决于 Agnes AI 模型能力
+4. **edit_image** 的实际效果取决于 API 模型能力
 5. **generate_video** 的输出格式取决于 API 响应（可能是 URL/文本/base64）
-6. **图片生成默认模型**需要在调用时指定 `model='agnes-image-2.1-flash'`，client.py 的 `image_generation()` 未硬编码图片模型
-7. **Windows 终端编码**：直接运行时中文可能显示乱码，MCP 协议层面无此问题
-8. **Pillow** 已安装但当前未被核心流程使用（设计层面预留用于未来本地图片格式检测优化）
+6. **Provider 能力声明**是静态的（来自 catalog），不通过 API 探测
+7. **health_check()** 当前仅返回 True，未实现实际的 API 可用性探测
+8. **Windows 终端编码**：直接运行时中文可能显示乱码，MCP 协议层面无此问题
+9. **Pillow** 已安装但当前未被核心流程使用（设计层面预留用于未来本地图片格式检测优化）
+10. **VISION_PROVIDERS_CONFIG**（JSON 格式高级配置）已预留但本期不解析
 
 ---
 
@@ -389,9 +477,17 @@ mcp-vision-server/
 ├── mcp_vision_server/
 │   ├── __init__.py                   # 包标识
 │   ├── __main__.py                   # python -m 入口
-│   ├── config.py                     # 配置常量
-│   ├── client.py                     # AgnesClient (HTTP + 重试)
-│   ├── server.py                     # MCP 协议层（工具注册 + 路由 + 启动）
+│   ├── config.py                     # 配置常量（多 Provider）
+│   ├── client.py                     # AgnesClient（向后兼容）
+│   ├── server.py                     # MCP 协议层（工具注册 + Provider路由 + 启动）
+│   ├── providers/                    # ← v0.2 新增：Provider 抽象层
+│   │   ├── __init__.py
+│   │   ├── base.py                   # BaseProvider ABC + Capability 枚举
+│   │   ├── catalog.py                # 内置 Provider 默认配置
+│   │   ├── registry.py               # ProviderRegistry + 路由 + TOOL_CAPABILITY
+│   │   └── adapters/
+│   │       ├── __init__.py
+│   │       └── openai_compat.py      # 通用 OpenAI 兼容适配器
 │   ├── tools/
 │   │   ├── __init__.py
 │   │   ├── analyze_image.py          # handle_analyze_image + handle_extract_text
@@ -409,7 +505,11 @@ mcp-vision-server/
 │   ├── test_client.py
 │   ├── test_tools_analyze.py
 │   ├── test_tools_generate.py
-│   └── test_tools_video.py
+│   ├── test_tools_video.py
+│   └── providers/                    # ← v0.2 新增测试
+│       ├── __init__.py
+│       ├── test_registry.py
+│       └── test_openai_compat.py
 ├── pyproject.toml                    # 包元信息 + 依赖
 ├── README.md                         # 用户文档
 ├── PROJECT.md                        # ← 你正在读的文件

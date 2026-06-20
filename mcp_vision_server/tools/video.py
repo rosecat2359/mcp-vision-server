@@ -5,15 +5,16 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from ..client import AgnesClient
+from ..providers.adapters.openai_compat import OpenAICompatibleProvider
 from ..utils.media import download_to_base64, resolve_media_input
 
 
 async def handle_analyze_video(
-    client: AgnesClient,
+    client: OpenAICompatibleProvider,
     video_url: str,
     prompt: Optional[str] = None,
     fps: Optional[int] = None,
+    model: Optional[str] = None,
 ) -> str:
     """分析视频内容，返回文字描述/摘要"""
     media = resolve_media_input(video_url)
@@ -34,15 +35,19 @@ async def handle_analyze_video(
         {"type": "text", "text": text_prompt},
     ]
 
-    result = await client.chat_completion(messages=[{"role": "user", "content": content}])
+    result = await client.chat_completion(
+        messages=[{"role": "user", "content": content}],
+        model=model,
+    )
     return result["choices"][0]["message"]["content"]
 
 
 async def handle_generate_video(
-    client: AgnesClient,
+    client: OpenAICompatibleProvider,
     prompt: str,
     duration: str = "5s",
     resolution: str = "1080p",
+    model: Optional[str] = None,
 ) -> List[str]:
     """文生视频 — 返回生成的视频 base64 data URI 列表"""
     gen_prompt = (
@@ -55,7 +60,9 @@ async def handle_generate_video(
         {"role": "user", "content": gen_prompt}
     ]
 
-    result = await client.chat_completion(messages=messages)
+    result = await client.chat_completion(
+        messages=messages, model=model,
+    )
 
     # 解析响应中的视频 URL
     response_text = result["choices"][0]["message"]["content"]

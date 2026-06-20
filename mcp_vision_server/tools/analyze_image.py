@@ -1,7 +1,7 @@
 """图片分析工具 — analyze_image + extract_text"""
 from typing import Any, Dict, Optional
 from ..utils.media import resolve_media_input
-from ..client import AgnesClient
+from ..providers.adapters.openai_compat import OpenAICompatibleProvider
 
 
 def _build_vision_message(
@@ -21,7 +21,7 @@ def _build_vision_message(
 
 
 async def handle_analyze_image(
-    client: AgnesClient,
+    client: OpenAICompatibleProvider,
     image_url: str,
     prompt: Optional[str] = None,
     model: Optional[str] = None,
@@ -37,9 +37,10 @@ async def handle_analyze_image(
 
 
 async def handle_extract_text(
-    client: AgnesClient,
+    client: OpenAICompatibleProvider,
     image_url: str,
     language: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> str:
     """从图片中提取文字（OCR）"""
     lang_hint = f"（语言: {language}）" if language else ""
@@ -49,5 +50,7 @@ async def handle_extract_text(
     )
 
     message = _build_vision_message(image_url, text_prompt)
-    result = await client.chat_completion(messages=[message])
+    result = await client.chat_completion(
+        messages=[message], model=model
+    )
     return result["choices"][0]["message"]["content"]

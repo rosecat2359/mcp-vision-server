@@ -1,4 +1,10 @@
-"""Agnes AI API 客户端 — HTTP 请求、鉴权、重试、错误转换"""
+"""Agnes AI API 客户端 — 向后兼容
+
+推荐: 新代码使用 providers 模块获得多 Provider 支持:
+    from .providers import get_registry
+
+本文件保留以保持向后兼容，原有使用方式不受影响。
+"""
 import asyncio
 from typing import Any, Dict, List, Optional
 
@@ -15,7 +21,13 @@ from .utils.errors import api_error, auth_failed, connection_failed, timeout
 
 
 class AgnesClient:
-    """Agnes AI API 异步客户端"""
+    """Agnes AI API 异步客户端
+
+    注意: 该类仍然可用且保持不变。新代码建议使用:
+        from mcp_vision_server.providers import get_registry
+
+    ProviderRegistry 支持 OpenAI、OpenRouter、Groq、自定义端点等多 Provider。
+    """
 
     def __init__(self) -> None:
         self.base_url = AGNES_BASE_URL.rstrip("/")
@@ -60,7 +72,7 @@ class AgnesClient:
                 if response.status_code >= 500:
                     if retries < self.max_retries:
                         retries += 1
-                        await asyncio.sleep(2**retries)
+                        await asyncio.sleep(2 ** retries)
                         continue
                     raise api_error(
                         response.status_code,
@@ -72,18 +84,17 @@ class AgnesClient:
             except httpx.TimeoutException:
                 if retries < self.max_retries:
                     retries += 1
-                    await asyncio.sleep(2**retries)
+                    await asyncio.sleep(2 ** retries)
                     continue
                 raise timeout(retries)
 
             except httpx.ConnectError:
                 if retries < self.max_retries:
                     retries += 1
-                    await asyncio.sleep(2**retries)
+                    await asyncio.sleep(2 ** retries)
                     continue
                 raise connection_failed()
 
-            # 不重试 auth_failed 和其他 VisionError
             except Exception:
                 raise
 
