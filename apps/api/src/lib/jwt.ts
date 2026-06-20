@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import { getEnv } from "../env.js";
-import { AppError, ErrorCodes } from "./errors.js";
+import { AppError } from "./errors.js";
 
 export interface JwtPayload {
   userId: string;

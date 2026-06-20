@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { AppError, ErrorCodes } from "../../lib/errors.js";
+import { AppError } from "../../lib/errors.js";
 import { encrypt, decrypt } from "../../lib/crypto.js";
 import { getEnv } from "../../env.js";
 import type {
