@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users     User[]
+  servers   McpServer[]
+  apiKeys   ApiKey[]
+  settings  TenantSettings?
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(Viewer)
+  totpSecret   String?
+  createdAt    DateTime @default(now())
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  auditLogs AuditLog[]
+
+  @@index([tenantId])
+}
+
+enum UserRole {
+  Admin
+  Operator
+  Viewer
+}
+
+model McpServer {
+  id           String       @id @default(uuid())
+  tenantId     String
+  name         String
+  transport    TransportType
+  endpoint     String
+  authType     AuthType     @default(none)
+  encryptedKey String?
+  status       ServerStatus @default(offline)
+  lastPing     DateTime?
+  tags         String[]     @default([])
+  createdAt    DateTime     @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  logs   ConnectionLog[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+enum TransportType {
+  sse
+  stdio
+}
+
+enum AuthType {
+  bearer
+  mtls
+  none
+}
+
+enum ServerStatus {
+  online
+  offline
+  error
+}
+
+model ApiKey {
+  id           String   @id @default(uuid())
+  tenantId     String
+  provider     String
+  label        String
+  encryptedKey String
+  keyPreview   String
+  isValid      Boolean?
+  lastTested   DateTime?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model ConnectionLog {
+  id        String   @id @default(uuid())
+  serverId  String
+  event     String
+  message   String?
+  timestamp DateTime @default(now())
+
+  server McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, timestamp])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  action    String
+  resource  String?
+  ip        String?
+  timestamp DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, timestamp])
+}
+
+model TenantSettings {
+  tenantId          String   @id
+  rateLimitPerMin   Int      @default(100)
+  sessionTimeoutMin Int      @default(1440)
+  allowedProviders  String[] @default(["anthropic", "openai", "openrouter", "groq", "custom"])
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
