@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
 import { AppError } from "./lib/errors.js";
 import { getEnv } from "./env.js";
+import { authRoutes } from "./modules/auth/auth.routes.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -43,6 +44,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get("/api/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  // 注册认证路由
+  await app.register(authRoutes);
 
   return app;
 }
