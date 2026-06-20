@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 import mcp.server.stdio
-from mcp.server import Server, NotificationOptions
+from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.types import (
     Tool,

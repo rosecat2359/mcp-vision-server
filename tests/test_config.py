@@ -24,10 +24,10 @@ class TestConfigDefaults:
         assert AGNES_MAX_RETRIES == 3
 
     def test_default_model(self):
-        """未设 AGNES_DEFAULT_MODEL 时默认 'default'"""
+        """未设 AGNES_DEFAULT_MODEL 时默认 'agnes-2.0-flash'"""
         os.environ.pop("AGNES_DEFAULT_MODEL", None)
         from mcp_vision_server.config import AGNES_DEFAULT_MODEL
-        assert AGNES_DEFAULT_MODEL == "default"
+        assert AGNES_DEFAULT_MODEL == "agnes-2.0-flash"
 
 
 class TestConfigFromEnv:

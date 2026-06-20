@@ -9,11 +9,7 @@ def _build_vision_message(
 ) -> Dict[str, Any]:
     """构建 OpenAI vision 格式的 message"""
     media = resolve_media_input(image_input)
-    image_block: Dict[str, Any]
-    if media["type"] == "data_uri":
-        image_block = {"type": "image_url", "image_url": {"url": media["value"]}}
-    else:
-        image_block = {"type": "image_url", "image_url": {"url": media["value"]}}
+    image_block = {"type": "image_url", "image_url": {"url": media["value"]}}
 
     return {
         "role": "user",

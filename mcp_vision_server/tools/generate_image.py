@@ -43,20 +43,13 @@ async def handle_edit_image(
 ) -> str:
     """编辑/修复图片，返回编辑后图片的 base64 data URI"""
     media = resolve_media_input(image_url)
-    image_block: Dict[str, Any]
-    if media["type"] == "data_uri":
-        image_block = {"type": "image_url", "image_url": {"url": media["value"]}}
-    else:
-        image_block = {"type": "image_url", "image_url": {"url": media["value"]}}
+    image_block = {"type": "image_url", "image_url": {"url": media["value"]}}
 
     content: List[Dict[str, Any]] = [image_block]
 
     if mask_url:
         mask_media = resolve_media_input(mask_url)
-        if mask_media["type"] == "data_uri":
-            mask_block = {"type": "image_url", "image_url": {"url": mask_media["value"]}}
-        else:
-            mask_block = {"type": "image_url", "image_url": {"url": mask_media["value"]}}
+        mask_block = {"type": "image_url", "image_url": {"url": mask_media["value"]}}
         content.append(mask_block)
 
     content.append({

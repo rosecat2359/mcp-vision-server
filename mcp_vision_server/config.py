@@ -26,6 +26,6 @@ def _int_env(key: str, default: int) -> int:
 
 AGNES_API_KEY = os.environ.get("AGNES_API_KEY", "")
 AGNES_BASE_URL = os.environ.get("AGNES_BASE_URL", "https://apihub.agnes-ai.com/v1")
-AGNES_DEFAULT_MODEL = os.environ.get("AGNES_DEFAULT_MODEL", "default")
+AGNES_DEFAULT_MODEL = os.environ.get("AGNES_DEFAULT_MODEL", "agnes-2.0-flash")
 AGNES_TIMEOUT = _float_env("AGNES_TIMEOUT", 120.0)
 AGNES_MAX_RETRIES = _int_env("AGNES_MAX_RETRIES", 3)
