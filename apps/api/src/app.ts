@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { AppError } from "./lib/errors.js";
 import { getEnv } from "./env.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
+import { serversRoutes } from "./modules/servers/servers.routes.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -47,6 +48,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // 注册认证路由
   await app.register(authRoutes);
+
+  // 注册 MCP Server 路由
+  await app.register(serversRoutes);
 
   return app;
 }
