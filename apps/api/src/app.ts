@@ -5,6 +5,8 @@ import { getEnv } from "./env.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { serversRoutes } from "./modules/servers/servers.routes.js";
 import { keysRoutes } from "./modules/keys/keys.routes.js";
+import { logsRoutes } from "./modules/logs/logs.routes.js";
+import { connectRoutes } from "./modules/connect/connect.routes.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -55,6 +57,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // 注册 API Key 路由
   await app.register(keysRoutes);
+
+  // 注册日志路由
+  await app.register(logsRoutes);
+
+  // 注册连接测试路由
+  await app.register(connectRoutes);
 
   return app;
 }
