@@ -16,7 +16,7 @@ export async function register(input: RegisterInput): Promise<LoginResponse> {
   const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
 
   // 创建租户 + 用户（事务）
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
     const tenant = await tx.tenant.create({ data: { name: input.tenantName } });
 
     // 创建默认租户配置

@@ -24,7 +24,7 @@ export async function listConnectionLogs(
       where: { tenantId },
       select: { id: true },
     });
-    where.serverId = { in: tenantServers.map((s) => s.id) };
+    where.serverId = { in: tenantServers.map((s: { id: string }) => s.id) };
   }
   if (filters.event) where.event = filters.event;
 
@@ -39,12 +39,12 @@ export async function listConnectionLogs(
   ]);
 
   return {
-    items: items.map((log) => ({
+    items: items.map((log: Record<string, unknown>) => ({
       id: log.id,
       serverId: log.serverId,
       event: log.event,
       message: log.message,
-      timestamp: log.timestamp.toISOString(),
+      timestamp: (log.timestamp as Date).toISOString(),
     })),
     total,
     page,
@@ -73,14 +73,14 @@ export async function listAuditLogs(
   ]);
 
   return {
-    items: items.map((log) => ({
+    items: items.map((log: Record<string, unknown>) => ({
       id: log.id,
       tenantId: log.tenantId,
       userId: log.userId,
       action: log.action,
       resource: log.resource,
       ip: log.ip,
-      timestamp: log.timestamp.toISOString(),
+      timestamp: (log.timestamp as Date).toISOString(),
     })),
     total,
     page,
