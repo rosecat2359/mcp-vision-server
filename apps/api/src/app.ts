@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
 import helmet from "@fastify/helmet";
+import rateLimitPlugin from "@fastify/rate-limit";
 import { AppError } from "./lib/errors.js";
 import { getEnv } from "./env.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
@@ -64,8 +65,16 @@ export async function buildApp(): Promise<FastifyInstance> {
   // WebSocket
   await app.register(websocketRoutes);
 
-  // 注册认证路由
-  await app.register(authRoutes);
+  // 注册认证路由 (10 req/min 严格限制)
+  await app.register(async (authScope) => {
+    await authScope.register(rateLimitPlugin, {
+      global: true,
+      max: 10,
+      timeWindow: "1 minute",
+      keyGenerator: (req) => req.ip,
+    });
+    await authScope.register(authRoutes);
+  });
 
   // 注册 MCP Server 路由
   await app.register(serversRoutes);

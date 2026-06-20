@@ -1,18 +1,15 @@
 import rateLimitPlugin from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 
+/**
+ * 全局 API 速率限制: 100 req/min
+ * Auth 路由更严格的 10 req/min 限制由 app.ts 中的子作用域处理
+ */
 export async function rateLimitSetup(app: FastifyInstance) {
   await app.register(rateLimitPlugin, {
-    global: false, // 手动按路由应用
-  });
-
-  // Auth routes: 10 req/min
-  app.register(async (authScope) => {
-    await authScope.register(rateLimitPlugin, {
-      max: 10,
-      timeWindow: "1 minute",
-      keyGenerator: (req) => req.ip,
-    });
-    // Auth routes are already registered — we apply rate limit globally here
+    global: true,
+    max: 100,
+    timeWindow: "1 minute",
+    keyGenerator: (req) => req.ip,
   });
 }
