@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { AppError, ErrorCodes } from "../../lib/errors.js";
+import { AppError } from "../../lib/errors.js";
 import { encrypt, decrypt, maskKey } from "../../lib/crypto.js";
 import { getEnv } from "../../env.js";
 import type { ApiKeyDTO, ApiKeyRevealDTO, CreateKeyInput, PaginatedResponse } from "@mcp-hub/shared";
@@ -76,7 +76,7 @@ export async function revealKey(tenantId: string, id: string): Promise<ApiKeyRev
   return { id: key.id, plainKey };
 }
 
-export async function testKey(tenantId: string, id: string): Promise<{ isValid: boolean }> {
+export async function testKey(tenantId: string, id: string): Promise<{ isValid: boolean | null }> {
   const key = await prisma.apiKey.findFirst({ where: { id, tenantId } });
   if (!key) {
     throw new AppError(404, "KEY_NOT_FOUND", "API Key 不存在");
@@ -112,7 +112,8 @@ export async function testKey(tenantId: string, id: string): Promise<{ isValid: 
       return { isValid };
     } else {
       // 对于自定义端点，标记为 null（不可自动验证）
-      return { isValid: true };
+      await prisma.apiKey.update({ where: { id }, data: { isValid: null, lastTested: new Date() } });
+      return { isValid: null };
     }
   } catch {
     await prisma.apiKey.update({ where: { id }, data: { isValid: false, lastTested: new Date() } });
