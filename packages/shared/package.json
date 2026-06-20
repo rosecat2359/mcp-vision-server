@@ -1,0 +1,14 @@
+{
+  "name": "@mcp-hub/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/api-types.ts",
+  "types": "./src/api-types.ts",
+  "exports": {
+    ".": "./src/api-types.ts",
+    "./mcp-config": "./src/mcp-config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}
