@@ -23,7 +23,7 @@ export async function serversRoutes(app: FastifyInstance) {
   // POST /api/servers
   app.post(
     "/api/servers",
-    { onRequest: [rbac("Operator")] },
+    { onRequest: [rbac("Operator")], onResponse: [auditLog("server.create")] },
     async (request, reply) => {
       const body = request.body as CreateServerInput;
       if (!body.name || !body.endpoint) {
@@ -45,7 +45,7 @@ export async function serversRoutes(app: FastifyInstance) {
   // PATCH /api/servers/:id
   app.patch(
     "/api/servers/:id",
-    { onRequest: [rbac("Operator")] },
+    { onRequest: [rbac("Operator")], onResponse: [auditLog("server.update")] },
     async (request) => {
       const { id } = request.params as { id: string };
       const body = request.body as UpdateServerInput;
@@ -56,7 +56,7 @@ export async function serversRoutes(app: FastifyInstance) {
   // DELETE /api/servers/:id
   app.delete(
     "/api/servers/:id",
-    { onRequest: [rbac("Admin")] },
+    { onRequest: [rbac("Admin")], onResponse: [auditLog("server.delete")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       await service.deleteServer(request.tenantId, id);
