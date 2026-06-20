@@ -39,11 +39,11 @@ export async function listConnectionLogs(
   ]);
 
   return {
-    items: items.map((log: Record<string, unknown>) => ({
-      id: log.id,
-      serverId: log.serverId,
-      event: log.event,
-      message: log.message,
+    items: items.map((log) => ({
+      id: log.id as string,
+      serverId: log.serverId as string,
+      event: log.event as string,
+      message: log.message as string | null,
       timestamp: (log.timestamp as Date).toISOString(),
     })),
     total,
@@ -73,13 +73,13 @@ export async function listAuditLogs(
   ]);
 
   return {
-    items: items.map((log: Record<string, unknown>) => ({
-      id: log.id,
-      tenantId: log.tenantId,
-      userId: log.userId,
-      action: log.action,
-      resource: log.resource,
-      ip: log.ip,
+    items: items.map((log) => ({
+      id: log.id as string,
+      tenantId: log.tenantId as string,
+      userId: log.userId as string,
+      action: log.action as string,
+      resource: log.resource as string | null,
+      ip: log.ip as string | null,
       timestamp: (log.timestamp as Date).toISOString(),
     })),
     total,

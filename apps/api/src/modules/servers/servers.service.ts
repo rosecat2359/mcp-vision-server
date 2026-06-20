@@ -110,11 +110,11 @@ export async function getServer(tenantId: string, id: string): Promise<McpServer
     throw new AppError(404, "SERVER_NOT_FOUND", "MCP Server 不存在");
   }
 
-  const recentLogs: ConnectionLogDTO[] = server.logs.map((log: Record<string, unknown>) => ({
-    id: log.id,
-    serverId: log.serverId,
-    event: log.event,
-    message: log.message,
+  const recentLogs: ConnectionLogDTO[] = server.logs.map((log) => ({
+    id: log.id as string,
+    serverId: log.serverId as string,
+    event: log.event as string,
+    message: log.message as string | null,
     timestamp: (log.timestamp as Date).toISOString(),
   }));
 
@@ -216,11 +216,11 @@ export async function getServerLogs(
   ]);
 
   return {
-    items: items.map((log: Record<string, unknown>) => ({
-      id: log.id,
-      serverId: log.serverId,
-      event: log.event,
-      message: log.message,
+    items: items.map((log) => ({
+      id: log.id as string,
+      serverId: log.serverId as string,
+      event: log.event as string,
+      message: log.message as string | null,
       timestamp: (log.timestamp as Date).toISOString(),
     })),
     total,
