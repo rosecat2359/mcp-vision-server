@@ -6,7 +6,7 @@ interface CodeBlockProps {
   language?: "json" | "yaml";
 }
 
-export function CodeBlock({ code, language = "json" }: CodeBlockProps) {
+export function CodeBlock({ code }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {

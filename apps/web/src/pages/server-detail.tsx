@@ -4,7 +4,7 @@ import { useServer, useDeleteServer, usePingServer } from "../hooks/use-servers.
 import { StatusIndicator } from "../components/ui/status-indicator.js";
 import { Badge } from "../components/ui/badge.js";
 import { pageTransition, pageTransitionConfig } from "../lib/motion.js";
-import { formatDateTime, formatLatency } from "../lib/utils.js";
+import { formatDateTime } from "../lib/utils.js";
 
 export function ServerDetail() {
   const { id } = useParams<{ id: string }>();
