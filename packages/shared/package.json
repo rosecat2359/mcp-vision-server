@@ -8,6 +8,9 @@
     ".": "./src/api-types.ts",
     "./mcp-config": "./src/mcp-config.ts"
   },
+  "scripts": {
+    "build": "tsc -b"
+  },
   "devDependencies": {
     "typescript": "^5.8.0"
   }
