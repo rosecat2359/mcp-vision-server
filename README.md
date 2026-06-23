@@ -215,8 +215,10 @@ docker-compose.yml  # PostgreSQL 17 + Redis 7
 #### 部署步骤
 
 ```bash
-# 1. 克隆仓库
-git clone -b feature/mcp-hub https://github.com/rosecat2359/mcp-vision-server.git /opt/mcp-hub
+# 1. 克隆仓库（国内服务器推荐用 Gitee，速度快）
+git clone https://gitee.com/rosecat2359/mcp-vision-server.git /opt/mcp-hub
+# 或从 GitHub 克隆
+# git clone https://github.com/rosecat2359/mcp-vision-server.git /opt/mcp-hub
 cd /opt/mcp-hub
 
 # 2. 执行部署（替换 你的域名）
