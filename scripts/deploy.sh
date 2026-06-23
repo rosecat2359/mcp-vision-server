@@ -220,6 +220,8 @@ cd "$APP_DIR"
 # 11. 构建
 # ============================================================================
 log "构建前端 + 后端（2G 内存可能较慢，有 swap 兜底）"
+# 清理 tsc 增量缓存，避免 dist 被删后 tsc -b 误判为 up-to-date 静默跳过
+rm -f packages/shared/tsconfig.tsbuildinfo packages/data/tsconfig.tsbuildinfo
 pnpm build
 
 # ============================================================================
