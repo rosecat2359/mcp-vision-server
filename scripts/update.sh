@@ -50,6 +50,11 @@ pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
 # 4. 数据库迁移（schema 变化时推送）
 log "Prisma generate + db push"
+# 手动 source .env，供 prisma.config.ts 读取 DATABASE_URL
+set -a
+# shellcheck disable=SC1091
+source "$APP_DIR/apps/api/.env"
+set +a
 (cd packages/data && pnpm db:generate && pnpm db:push)
 
 # 5. 重新构建

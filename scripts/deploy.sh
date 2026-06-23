@@ -205,6 +205,12 @@ fi
 # 10. Prisma 生成 + 推表
 # ============================================================================
 log "Prisma generate + db push"
+# Prisma 7 的 prisma.config.ts 用 env("DATABASE_URL") 从进程环境读取，
+# 不会自动加载 apps/api/.env，这里手动 source 进环境
+set -a
+# shellcheck disable=SC1091
+source "$APP_DIR/apps/api/.env"
+set +a
 cd packages/data
 pnpm db:generate
 pnpm db:push
