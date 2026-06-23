@@ -180,27 +180,126 @@ python -m pytest tests/ -v
 - httpx (HTTP)
 - Pillow (图片处理)
 
-## MCP Hub 部署指南
+## MCP Hub 部署指南（自托管）
 
-### 前端 (Vercel)
-1. 在 Vercel 中导入此仓库
-2. 设置 Root Directory: `apps/web`
-3. 设置 Framework Preset: Vite
-4. 部署
+本仓库同时包含 **MCP Hub**（一个管理多个 MCP Server 的 Web 平台），采用 pnpm + turbo monorepo：
 
-### 后端 (Railway)
-1. 在 Railway 中从 GitHub 导入
-2. 设置环境变量（见下方）
-3. 部署
+```
+apps/
+├── api/            # Fastify 5 后端（JWT + WebSocket + Bullmq 队列）
+└── web/            # React 18 + Vite 7 + Tailwind 4 前端
+packages/
+├── data/           # Prisma 数据层（PostgreSQL）
+└── shared/         # 跨端共享类型
+docker-compose.yml  # PostgreSQL 17 + Redis 7
+```
+
+### 一键部署（推荐）
+
+提供三个脚本（位于 `scripts/`）：
+
+| 脚本 | 用途 |
+|------|------|
+| `scripts/deploy.sh` | 全新部署：装环境 → 起数据库 → 构建 → 启动 → Caddy 反代 |
+| `scripts/update.sh` | 更新代码：拉取 → 依赖 → 构建 → 重启（保留 .env 和数据） |
+| `scripts/uninstall.sh` | 卸载：停止服务。`--purge` 彻底删除代码和数据 |
+
+#### 适用环境
+
+脚本针对**自托管云服务器**设计（已在阿里云上海验证）：
+
+- Ubuntu 22.04 / 24.04 / 26.04
+- 最低 2 核 2G / 20G SSD（建议 4G）
+- 需开放端口：22（SSH）、8443（HTTPS）
+
+#### 部署步骤
+
+```bash
+# 1. 克隆仓库
+git clone -b feature/mcp-hub https://github.com/rosecat2359/mcp-vision-server.git /opt/mcp-hub
+cd /opt/mcp-hub
+
+# 2. 执行部署（替换 你的域名）
+sudo DOMAIN=你的域名 bash scripts/deploy.sh
+```
+
+> 部署脚本会自动完成：swap、ufw、Node 20、Docker、Caddy、pnpm、pm2、Prisma、构建、反向代理、HTTPS 证书签发。
+
+#### 未备案服务器（大陆节点）
+
+ICP 备案要求年满 18 周岁。若无法备案，脚本默认使用 **8443 端口**绕过 80/443 拦截：
+
+- 访问地址：`https://你的域名:8443`
+- 需在云厂商**安全组**放行 8443/TCP（脚本无法代替）
+- 域名 A 记录需指向服务器公网 IP
 
 ### 环境变量
 
-| 变量 | 值 |
+部署脚本自动生成（写入 `apps/api/.env`，首次生成后不覆盖）：
+
+| 变量 | 说明 |
 |------|-----|
-| `DATABASE_URL` | `postgresql://...` |
-| `REDIS_URL` | `redis://...` |
-| `ENCRYPTION_MASTER_KEY` | 64 hex 字符 |
-| `JWT_SECRET` | 至少 32 字符 |
-| `JWT_REFRESH_SECRET` | 至少 32 字符 |
-| `CORS_ORIGIN` | Vercel 部署地址 |
+| `DATABASE_URL` | PostgreSQL 连接串（默认 `postgresql://mcp_hub:mcp_hub_dev@localhost:5432/mcp_hub`） |
+| `REDIS_URL` | Redis 连接串（默认 `redis://localhost:6379`） |
+| `ENCRYPTION_MASTER_KEY` | 64 位 hex，加密存储的 MCP server 凭据。**丢失则已存凭据无法解密** |
+| `JWT_SECRET` | JWT 签名密钥（≥32 字符，自动生成 64 hex） |
+| `JWT_REFRESH_SECRET` | Refresh Token 签名密钥（≥32 字符，自动生成 64 hex） |
+| `CORS_ORIGIN` | 前端地址，默认 `https://域名:8443` |
+| `PORT` | API 监听端口，默认 `3001` |
+| `HOST` | 监听地址，默认 `0.0.0.0` |
+
+> ⚠️ **务必备份 `ENCRYPTION_MASTER_KEY`**，服务器重装或迁移时需用同一密钥才能解密数据库中的凭据。
+
+### 更新与卸载
+
+```bash
+# 更新到最新代码
+sudo bash scripts/update.sh
+
+# 标准卸载（保留代码和数据）
+sudo bash scripts/uninstall.sh
+
+# 彻底卸载（删除代码 + 数据库数据，不可逆）
+sudo bash scripts/uninstall.sh --purge
+```
+
+### 常用运维命令
+
+```bash
+pm2 logs mcp-hub-api          # 查看后端日志
+pm2 restart mcp-hub-api       # 重启后端
+docker ps                     # 查看数据库容器
+journalctl -u caddy -f        # 查看 Caddy/HTTPS 日志
+docker compose logs -f        # 查看数据库日志
+```
+
+### 托管平台部署（可选）
+
+如不自行部署，也可用托管服务：
+
+- **前端**：Vercel，Root Directory 设为 `apps/web`，Framework Preset = Vite
+- **后端**：Railway，从 GitHub 导入并配置环境变量
+- **数据库**：Neon / Supabase（PostgreSQL 免费档）+ Upstash（Redis 免费档）
+
+> 注意：Vercel Hobby 计划不可商用；Railway 无长期免费计划。
+
+## 开发
+
+### MCP Hub（TypeScript）
+
+```bash
+pnpm install
+pnpm docker:up        # 启动本地 PostgreSQL + Redis
+pnpm db:generate && pnpm db:push
+pnpm dev              # 同时启动前端 (5173) 和后端 (3001)
+pnpm test             # 运行测试
+pnpm build            # 构建所有包
+```
+
+### 视觉服务（Python）
+
+```bash
+pip install -e ".[dev]"
+python -m pytest tests/ -v
+```
 
