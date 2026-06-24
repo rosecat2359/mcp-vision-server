@@ -1,19 +1,27 @@
+import { cn } from "../../lib/utils.js";
+
 interface BadgeProps {
   label: string;
   variant?: "default" | "success" | "warning" | "danger" | "info";
 }
 
+// 软标签 —— 淡底 + 语义色文字，方角，非全圆胶囊
 const variants = {
-  default: "bg-primary-50 text-primary-600 border-primary-400/20",
-  success: "bg-green-50 text-success border-green-400/20",
-  warning: "bg-amber-50 text-warning border-amber-400/20",
-  danger: "bg-red-50 text-danger border-red-400/20",
-  info: "bg-blue-50 text-info border-blue-400/20",
+  default: "bg-surface-sunken text-ink-muted border-border-default",
+  success: "bg-success-soft text-success border-success/20",
+  warning: "bg-warning-soft text-warning border-warning/20",
+  danger: "bg-danger-soft text-danger border-danger/20",
+  info: "bg-info-soft text-info border-info/20",
 };
 
 export function Badge({ label, variant = "default" }: BadgeProps) {
   return (
-    <span className={`inline-block px-2 py-0.5 text-xs rounded-full border ${variants[variant]}`}>
+    <span
+      className={cn(
+        "inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-sm border",
+        variants[variant]
+      )}
+    >
       {label}
     </span>
   );

@@ -1,32 +1,44 @@
-import { motion } from "framer-motion";
-import { pageTransition, pageTransitionConfig } from "../lib/motion.js";
 import { useAuthStore } from "../lib/auth.js";
+import { GlassCard } from "../components/ui/glass-card.js";
+import { PageHeader } from "../components/layout/page-header.js";
+import { Badge } from "../components/ui/badge.js";
+
+const roleLabels: Record<string, { label: string; variant: "info" | "success" | "default" }> = {
+  Admin: { label: "管理员", variant: "info" },
+  Operator: { label: "操作员", variant: "success" },
+  Viewer: { label: "访客", variant: "default" },
+};
 
 export function Settings() {
   const user = useAuthStore((s) => s.user);
   const tenant = useAuthStore((s) => s.tenant);
+  const role = user?.role ? roleLabels[user.role] ?? { label: user.role, variant: "default" as const } : null;
+
+  const fields = [
+    { label: "工作区名称", value: tenant?.name ?? "—" },
+    { label: "邮箱", value: user?.email ?? "—" },
+    { label: "角色", value: role ? <Badge label={role.label} variant={role.variant} /> : "—" },
+    {
+      label: "注册时间",
+      value: user?.createdAt
+        ? new Date(user.createdAt).toLocaleDateString("zh-CN")
+        : "—",
+    },
+  ];
 
   return (
-    <motion.div variants={pageTransition} initial="initial" animate="animate" transition={pageTransitionConfig} className="max-w-2xl">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">设置</h2>
-      <div className="bg-white/72 backdrop-blur-xl rounded-2xl border border-border-default p-6 space-y-4">
-        <div>
-          <label className="text-sm text-gray-400">团队名称</label>
-          <p className="font-medium">{tenant?.name}</p>
-        </div>
-        <div>
-          <label className="text-sm text-gray-400">邮箱</label>
-          <p className="font-medium">{user?.email}</p>
-        </div>
-        <div>
-          <label className="text-sm text-gray-400">角色</label>
-          <p className="font-medium">{user?.role}</p>
-        </div>
-        <div>
-          <label className="text-sm text-gray-400">注册时间</label>
-          <p className="font-medium">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString("zh-CN") : "-"}</p>
-        </div>
-      </div>
-    </motion.div>
+    <div className="max-w-2xl">
+      <PageHeader title="设置" description="账户与工作区信息" />
+      <GlassCard className="p-6">
+        <dl className="divide-y divide-border-default">
+          {fields.map((f) => (
+            <div key={f.label} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+              <dt className="text-sm text-ink-muted">{f.label}</dt>
+              <dd className="text-sm text-ink-strong font-medium text-right">{f.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </GlassCard>
+    </div>
   );
 }

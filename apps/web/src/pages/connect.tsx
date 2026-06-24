@@ -1,11 +1,18 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useServers } from "../hooks/use-servers.js";
 import { useKeys } from "../hooks/use-keys.js";
 import { api } from "../lib/api.js";
-import { pageTransition, pageTransitionConfig } from "../lib/motion.js";
 import { CodeBlock } from "../components/ui/code-block.js";
+import { GlassCard } from "../components/ui/glass-card.js";
+import { Button } from "../components/ui/button.js";
+import { Select } from "../components/ui/field.js";
+import { PageHeader } from "../components/layout/page-header.js";
+import { Icon } from "../components/ui/icon.js";
+import { cn } from "../lib/utils.js";
 import type { GenerateConfigOutput, ConnectTestOutput } from "@mcp-hub/shared";
+
+const steps = ["选择服务器", "选择密钥", "测试连接", "生成配置"];
 
 export function Connect() {
   const { data: servers } = useServers();
@@ -21,93 +28,169 @@ export function Connect() {
     const server = servers?.items.find((s) => s.id === selectedServerId);
     if (!server) return;
     setTesting(true);
-    const res = await api.post("connect/test", { json: { endpoint: server.endpoint, transport: server.transport, authType: server.authType } }).json<ConnectTestOutput>();
-    setTestResult(res);
-    setTesting(false);
-    if (res.success) setStep(4);
+    try {
+      const res = await api
+        .post("connect/test", {
+          json: { endpoint: server.endpoint, transport: server.transport, authType: server.authType },
+        })
+        .json<ConnectTestOutput>();
+      setTestResult(res);
+      if (res.success) setStep(4);
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleGenerate = async () => {
-    const res = await api.post("connect/generate", { json: { serverId: selectedServerId, keyId: selectedKeyId || undefined } }).json<GenerateConfigOutput>();
+    const res = await api
+      .post("connect/generate", { json: { serverId: selectedServerId, keyId: selectedKeyId || undefined } })
+      .json<GenerateConfigOutput>();
     setConfig(res);
   };
 
   return (
-    <motion.div variants={pageTransition} initial="initial" animate="animate" transition={pageTransitionConfig} className="max-w-2xl">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">连接配置向导</h2>
+    <div className="max-w-2xl">
+      <PageHeader title="连接向导" description="生成 Claude Desktop / 客户端接入配置" />
 
-      {/* Steps */}
-      <div className="flex gap-4 mb-8">
-        {[1, 2, 3, 4].map((s) => (
-          <div key={s} className={`flex items-center gap-2 text-sm ${step >= s ? "text-primary-600 font-medium" : "text-gray-400"}`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= s ? "bg-primary-600 text-white" : "bg-gray-200"}`}>{s}</span>
-            {["选 Server", "选 Key", "测试", "生成"][s - 1]}
-          </div>
-        ))}
+      {/* 步骤指示器 —— 横向带连接线 */}
+      <div className="flex items-center mb-8">
+        {steps.map((label, i) => {
+          const n = i + 1;
+          const done = step > n;
+          const active = step === n;
+          return (
+            <div key={label} className="flex items-center flex-1 last:flex-none">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium border transition-colors",
+                    done && "bg-accent text-accent-on border-accent",
+                    active && "bg-accent-soft text-accent border-accent",
+                    !done && !active && "bg-surface text-ink-faint border-border-default"
+                  )}
+                >
+                  {done ? <Icon name="check" className="w-3.5 h-3.5" strokeWidth={2} /> : n}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs whitespace-nowrap",
+                    (done || active) ? "text-ink-strong font-medium" : "text-ink-faint"
+                  )}
+                >
+                  {label}
+                </span>
+              </div>
+              {n < steps.length && (
+                <div className={cn("flex-1 h-px mx-3", done ? "bg-accent" : "bg-border-default")} />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <AnimatePresence mode="wait">
         {step === 1 && (
-          <motion.div key="s1" variants={pageTransition} initial="initial" animate="animate" exit="exit" transition={pageTransitionConfig}>
-            <h3 className="font-semibold mb-3">选择 MCP Server</h3>
-            <select value={selectedServerId} onChange={(e) => setSelectedServerId(e.target.value)}
-              className="w-full px-4 py-2 border border-border-default rounded-xl bg-white/60 mb-4">
-              <option value="">-- 选择 --</option>
-              {servers?.items.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.transport})</option>)}
-            </select>
-            <button onClick={() => setStep(2)} disabled={!selectedServerId}
-              className="px-6 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-900 transition-colors disabled:opacity-50">
+          <Step key="s1">
+            <h2 className="text-sm font-medium text-ink-strong mb-3">选择 MCP Server</h2>
+            <Select
+              value={selectedServerId}
+              onChange={(e) => setSelectedServerId(e.target.value)}
+              className="mb-4"
+            >
+              <option value="">请选择服务器</option>
+              {servers?.items.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}（{s.transport}）
+                </option>
+              ))}
+            </Select>
+            <Button variant="primary" icon="chevron-right" iconPosition="right" disabled={!selectedServerId} onClick={() => setStep(2)}>
               下一步
-            </button>
-          </motion.div>
+            </Button>
+          </Step>
         )}
 
         {step === 2 && (
-          <motion.div key="s2" variants={pageTransition} initial="initial" animate="animate" exit="exit" transition={pageTransitionConfig}>
-            <h3 className="font-semibold mb-3">选择 API Key (可选)</h3>
-            <select value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)}
-              className="w-full px-4 py-2 border border-border-default rounded-xl bg-white/60 mb-4">
-              <option value="">-- 不使用 --</option>
-              {keys?.items.map((k) => <option key={k.id} value={k.id}>{k.provider} — {k.label}</option>)}
-            </select>
+          <Step key="s2">
+            <h2 className="text-sm font-medium text-ink-strong mb-1">选择 API Key（可选）</h2>
+            <p className="text-xs text-ink-muted mb-3">若服务器需要鉴权，选择对应的密钥</p>
+            <Select
+              value={selectedKeyId}
+              onChange={(e) => setSelectedKeyId(e.target.value)}
+              className="mb-4"
+            >
+              <option value="">不使用密钥</option>
+              {keys?.items.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.provider} — {k.label}
+                </option>
+              ))}
+            </Select>
             <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="px-6 py-2 border border-border-strong rounded-xl text-sm hover:bg-white/50 transition-colors">上一步</button>
-              <button onClick={() => setStep(3)} className="px-6 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-900 transition-colors">下一步</button>
+              <Button variant="secondary" onClick={() => setStep(1)}>上一步</Button>
+              <Button variant="primary" icon="chevron-right" iconPosition="right" onClick={() => setStep(3)}>
+                下一步
+              </Button>
             </div>
-          </motion.div>
+          </Step>
         )}
 
         {step === 3 && (
-          <motion.div key="s3" variants={pageTransition} initial="initial" animate="animate" exit="exit" transition={pageTransitionConfig}>
-            <h3 className="font-semibold mb-3">测试连接</h3>
-            <button onClick={handleTest} disabled={testing}
-              className="px-6 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-900 transition-colors disabled:opacity-50 mb-4">
-              {testing ? "测试中..." : "开始测试"}
-            </button>
+          <Step key="s3">
+            <h2 className="text-sm font-medium text-ink-strong mb-3">测试连接</h2>
+            <Button variant="primary" icon="refresh" loading={testing} onClick={handleTest} className="mb-4">
+              {testing ? "测试中" : "开始测试"}
+            </Button>
             {testResult && (
-              <div className={`p-4 rounded-xl ${testResult.success ? "bg-green-50 text-success" : "bg-red-50 text-danger"} text-sm`}>
-                {testResult.success ? `✓ 连接成功 (${testResult.latencyMs}ms)` : `✗ 连接失败: ${testResult.error}`}
+              <div
+                className={cn(
+                  "p-3 rounded-md text-sm flex items-start gap-2",
+                  testResult.success ? "bg-success-soft text-success" : "bg-danger-soft text-danger"
+                )}
+              >
+                <Icon name={testResult.success ? "check" : "alert"} className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  {testResult.success
+                    ? `连接成功（延迟 ${testResult.latencyMs}ms）`
+                    : `连接失败：${testResult.error}`}
+                </span>
               </div>
             )}
             <div className="flex gap-3 mt-4">
-              <button onClick={() => setStep(2)} className="px-6 py-2 border border-border-strong rounded-xl text-sm hover:bg-white/50 transition-colors">上一步</button>
+              <Button variant="secondary" onClick={() => setStep(2)}>上一步</Button>
               {testResult?.success && (
-                <button onClick={handleGenerate} className="px-6 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-900 transition-colors">生成配置</button>
+                <Button variant="primary" icon="chevron-right" iconPosition="right" onClick={handleGenerate}>
+                  生成配置
+                </Button>
               )}
             </div>
-          </motion.div>
+          </Step>
         )}
 
         {step === 4 && config && (
-          <motion.div key="s4" variants={pageTransition} initial="initial" animate="animate" exit="exit" transition={pageTransitionConfig}>
-            <h3 className="font-semibold mb-3">Claude Desktop 配置</h3>
+          <Step key="s4">
+            <h2 className="text-sm font-medium text-ink-strong mb-1">Claude Desktop 配置</h2>
+            <p className="text-xs text-ink-muted mb-3">将以下内容粘贴到 Claude Desktop 配置文件</p>
             <CodeBlock code={JSON.stringify(config.json, null, 2)} language="json" />
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setStep(1)} className="px-6 py-2 border border-border-strong rounded-xl text-sm hover:bg-white/50 transition-colors">重新开始</button>
-            </div>
-          </motion.div>
+            <Button variant="secondary" icon="refresh" className="mt-4" onClick={() => { setStep(1); setConfig(null); setTestResult(null); }}>
+              重新开始
+            </Button>
+          </Step>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function Step({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+    >
+      <GlassCard className="p-6">{children}</GlassCard>
     </motion.div>
   );
 }

@@ -194,7 +194,12 @@ packages/
 docker-compose.yml  # PostgreSQL 17 + Redis 7
 ```
 
-### 一键部署（推荐）
+## 文档
+
+- [用户使用教程](docs/user-guide.md) — 功能介绍与操作指引
+- [运维手册](docs/ops.md) — 服务器运维、备份、排障、升级
+
+## MCP Hub 部署指南（自托管）
 
 提供三个脚本（位于 `scripts/`）：
 

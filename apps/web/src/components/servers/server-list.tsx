@@ -1,5 +1,6 @@
 import { ServerCard } from "./server-card.js";
 import { EmptyState } from "../ui/empty-state.js";
+import { Button } from "../ui/button.js";
 import type { McpServerDTO } from "@mcp-hub/shared";
 import { Link } from "react-router-dom";
 
@@ -11,15 +12,14 @@ export function ServerList({ servers }: ServerListProps) {
   if (servers.length === 0) {
     return (
       <EmptyState
-        icon="🖥"
-        title="还没有 MCP Server"
-        description="注册你的第一个 MCP Server 开始使用"
+        icon="server"
+        title="还没有服务器"
+        description="添加你的第一个 MCP Server，开始集中管理远程工具调用"
         action={
-          <Link
-            to="/dashboard/servers/new"
-            className="px-6 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-900 transition-colors"
-          >
-            添加 Server
+          <Link to="/dashboard/servers/new">
+            <Button variant="primary" icon="plus">
+              添加服务器
+            </Button>
           </Link>
         }
       />
@@ -28,8 +28,8 @@ export function ServerList({ servers }: ServerListProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {servers.map((server, i) => (
-        <ServerCard key={server.id} server={server} index={i} />
+      {servers.map((server) => (
+        <ServerCard key={server.id} server={server} />
       ))}
     </div>
   );

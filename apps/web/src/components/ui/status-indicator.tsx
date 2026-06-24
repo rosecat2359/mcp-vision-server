@@ -1,13 +1,14 @@
-import { motion } from "framer-motion";
-import { statusPulse } from "../../lib/motion.js";
+import { cn } from "../../lib/utils.js";
 
 interface StatusIndicatorProps {
   status: "online" | "offline" | "error";
+  showLabel?: boolean;
 }
 
-const colors = {
+// 状态点 —— 静态色点，无永动心跳。状态用颜色表达。
+const dotColor = {
   online: "bg-success",
-  offline: "bg-gray-400",
+  offline: "bg-ink-faint",
   error: "bg-danger",
 };
 
@@ -17,14 +18,25 @@ const labels = {
   error: "错误",
 };
 
-export function StatusIndicator({ status }: StatusIndicatorProps) {
+const textColor = {
+  online: "text-success",
+  offline: "text-ink-muted",
+  error: "text-danger",
+};
+
+export function StatusIndicator({ status, showLabel = true }: StatusIndicatorProps) {
   return (
-    <div className="flex items-center gap-2">
-      <motion.span
-        className={`w-2.5 h-2.5 rounded-full ${colors[status]}`}
-        {...(status === "online" ? statusPulse : {})}
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className={cn("w-2 h-2 rounded-full", dotColor[status])}
+        role="status"
+        aria-label={labels[status]}
       />
-      <span className="text-sm text-gray-500">{labels[status]}</span>
-    </div>
+      {showLabel && (
+        <span className={cn("text-xs font-medium", textColor[status])}>
+          {labels[status]}
+        </span>
+      )}
+    </span>
   );
 }

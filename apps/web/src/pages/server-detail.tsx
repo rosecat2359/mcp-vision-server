@@ -1,10 +1,19 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { useServer, useDeleteServer, usePingServer } from "../hooks/use-servers.js";
 import { StatusIndicator } from "../components/ui/status-indicator.js";
 import { Badge } from "../components/ui/badge.js";
-import { pageTransition, pageTransitionConfig } from "../lib/motion.js";
+import { GlassCard } from "../components/ui/glass-card.js";
+import { Button } from "../components/ui/button.js";
+import { PageHeader } from "../components/layout/page-header.js";
+import { Icon } from "../components/ui/icon.js";
+import { Link } from "react-router-dom";
 import { formatDateTime } from "../lib/utils.js";
+
+const authLabels: Record<string, string> = {
+  bearer: "Bearer Token",
+  mtls: "mTLS",
+  none: "无鉴权",
+};
 
 export function ServerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -13,71 +22,95 @@ export function ServerDetail() {
   const pingServer = usePingServer();
   const deleteServer = useDeleteServer();
 
-  if (isLoading) return <p className="text-gray-400">加载中...</p>;
-  if (!server) return <p className="text-danger">Server 不存在</p>;
+  if (isLoading) {
+    return <div className="h-48 bg-surface border border-border-default rounded-lg animate-pulse" />;
+  }
+  if (!server) {
+    return (
+      <div>
+        <PageHeader title="服务器不存在" />
+        <GlassCard className="p-8 text-center">
+          <p className="text-sm text-ink-muted">该服务器可能已被删除</p>
+          <Link to="/dashboard/servers" className="inline-block mt-3">
+            <Button variant="secondary" icon="chevron-right" iconPosition="right">
+              返回列表
+            </Button>
+          </Link>
+        </GlassCard>
+      </div>
+    );
+  }
 
   const handleDelete = async () => {
-    if (confirm(`确定删除 "${server.name}"？此操作不可撤销。`)) {
+    if (confirm(`确定删除「${server.name}」？此操作不可撤销。`)) {
       deleteServer.mutate(server.id, { onSuccess: () => navigate("/dashboard/servers") });
     }
   };
 
-  return (
-    <motion.div
-      variants={pageTransition} initial="initial" animate="animate" transition={pageTransitionConfig}
-      className="max-w-2xl"
-    >
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">{server.name}</h2>
-        <StatusIndicator status={server.status} />
-      </div>
+  const fields = [
+    { label: "传输模式", value: server.transport.toUpperCase() },
+    { label: "鉴权方式", value: authLabels[server.authType] ?? server.authType },
+    { label: "创建时间", value: formatDateTime(server.createdAt) },
+    { label: "最近 Ping", value: server.lastPing ? formatDateTime(server.lastPing) : "从未" },
+  ];
 
-      <div className="bg-white/72 backdrop-blur-xl rounded-2xl border border-border-default p-6 space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><span className="text-gray-400">传输模式</span><p className="font-medium">{server.transport.toUpperCase()}</p></div>
-          <div><span className="text-gray-400">鉴权方式</span><p className="font-medium">{server.authType}</p></div>
-          <div className="col-span-2"><span className="text-gray-400">端点</span><p className="font-medium font-mono">{server.endpoint}</p></div>
-          <div><span className="text-gray-400">创建时间</span><p className="font-medium">{formatDateTime(server.createdAt)}</p></div>
-          <div><span className="text-gray-400">最近 Ping</span><p className="font-medium">{server.lastPing ? formatDateTime(server.lastPing) : "从未"}</p></div>
-        </div>
+  return (
+    <div>
+      <PageHeader
+        title={server.name}
+        action={<StatusIndicator status={server.status} />}
+      />
+
+      <GlassCard className="p-6 mb-6">
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-5">
+          {fields.map((f) => (
+            <div key={f.label}>
+              <dt className="text-xs text-ink-faint mb-1">{f.label}</dt>
+              <dd className="text-sm text-ink-strong font-medium">{f.value}</dd>
+            </div>
+          ))}
+          <div className="col-span-2">
+            <dt className="text-xs text-ink-faint mb-1">端点</dt>
+            <dd className="text-sm text-ink-strong font-mono break-all">{server.endpoint}</dd>
+          </div>
+        </dl>
 
         {server.tags.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {server.tags.map((tag) => <Badge key={tag} label={tag} />)}
+          <div className="flex gap-1.5 flex-wrap mt-5 pt-5 border-t border-border-default">
+            {server.tags.map((tag) => (
+              <Badge key={tag} label={tag} />
+            ))}
           </div>
         )}
 
-        <div className="flex gap-3 pt-4 border-t border-border-default">
-          <button
+        <div className="flex gap-3 mt-5 pt-5 border-t border-border-default">
+          <Button
+            variant="primary"
+            icon="refresh"
+            loading={pingServer.isPending}
             onClick={() => pingServer.mutate(server.id)}
-            disabled={pingServer.isPending}
-            className="px-4 py-2 bg-primary-600 text-white rounded-xl text-sm hover:bg-primary-900 transition-colors disabled:opacity-50"
           >
-            {pingServer.isPending ? "Pinging..." : "Ping Now"}
-          </button>
-          <button
-            onClick={handleDelete}
-            className="px-4 py-2 border border-danger text-danger rounded-xl text-sm hover:bg-red-50 transition-colors"
-          >
+            {pingServer.isPending ? "检测中" : "立即检测"}
+          </Button>
+          <Button variant="danger" icon="x" onClick={handleDelete}>
             删除
-          </button>
+          </Button>
         </div>
-      </div>
+      </GlassCard>
 
-      {/* Recent Logs */}
       {server.recentLogs.length > 0 && (
-        <div className="mt-6">
-          <h3 className="font-semibold text-gray-700 mb-3">最近日志</h3>
-          <div className="bg-white/60 rounded-xl border border-border-default divide-y divide-border-default">
+        <div>
+          <h2 className="text-sm font-medium text-ink-strong mb-3">最近日志</h2>
+          <GlassCard className="divide-y divide-border-default">
             {server.recentLogs.map((log) => (
-              <div key={log.id} className="px-4 py-2 text-sm flex justify-between">
-                <span className="font-mono text-gray-600">{log.event}</span>
-                <span className="text-gray-400">{formatDateTime(log.timestamp)}</span>
+              <div key={log.id} className="px-4 py-2.5 text-sm flex justify-between items-center">
+                <span className="font-mono text-ink-muted">{log.event}</span>
+                <span className="text-xs text-ink-faint">{formatDateTime(log.timestamp)}</span>
               </div>
             ))}
-          </div>
+          </GlassCard>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

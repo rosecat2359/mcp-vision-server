@@ -1,35 +1,51 @@
 import { NavLink } from "react-router-dom";
+import { Icon, type IconName } from "../ui/icon.js";
+import { cn } from "../../lib/utils.js";
 
-const links = [
-  { to: "/dashboard/servers", label: "Servers", icon: "🖥" },
-  { to: "/dashboard/keys", label: "API Keys", icon: "🔑" },
-  { to: "/dashboard/connect", label: "连接向导", icon: "🔗" },
-  { to: "/dashboard/logs", label: "日志", icon: "📋" },
-  { to: "/dashboard/settings", label: "设置", icon: "⚙" },
+const links: { to: string; label: string; icon: IconName }[] = [
+  { to: "/dashboard/servers", label: "服务器", icon: "server" },
+  { to: "/dashboard/keys", label: "API 密钥", icon: "key" },
+  { to: "/dashboard/connect", label: "连接向导", icon: "plug" },
+  { to: "/dashboard/logs", label: "日志", icon: "logs" },
+  { to: "/dashboard/settings", label: "设置", icon: "settings" },
 ];
 
 export function Sidebar() {
   return (
-    <aside className="w-64 bg-white/72 backdrop-blur-xl border-r border-border-default p-4 flex flex-col">
-      <div className="text-xl font-bold text-primary-600 mb-8 px-3">MCP Hub</div>
-      <nav className="space-y-1 flex-1">
+    <aside className="w-56 bg-surface border-r border-border-default flex flex-col shrink-0">
+      {/* Logo 区 */}
+      <div className="h-14 flex items-center gap-2 px-5 border-b border-border-default">
+        <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center">
+          <Icon name="terminal" className="w-4 h-4 text-accent-on" strokeWidth={2} />
+        </div>
+        <span className="font-semibold text-ink-strong tracking-tight">MCP Hub</span>
+      </div>
+
+      {/* 导航 */}
+      <nav className="flex-1 p-3 space-y-0.5">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors ${
+              cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
                 isActive
-                  ? "bg-primary-50 text-primary-600 font-medium"
-                  : "text-gray-600 hover:bg-white/50"
-              }`
+                  ? "bg-accent-soft text-accent font-medium"
+                  : "text-ink-muted hover:bg-surface-sunken hover:text-ink"
+              )
             }
           >
-            <span>{link.icon}</span>
+            <Icon name={link.icon} className="w-4 h-4" />
             {link.label}
           </NavLink>
         ))}
       </nav>
+
+      {/* 底部版本信息 */}
+      <div className="p-4 border-t border-border-default">
+        <p className="text-xs text-ink-faint">MCP Hub v0.1</p>
+      </div>
     </aside>
   );
 }
